@@ -21,6 +21,7 @@ def test_dashboard_renders_guest_summary(client, monkeypatch, frontend_bundle):
     assert "訪客模式" in response.text
     assert "駐警隊" in response.text
     assert "請登入以查看" in response.text
+    assert 'href="/report"' in response.text
     assert "白色 AirPods Pro 耳機" not in response.text
 
 

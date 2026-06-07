@@ -106,7 +106,7 @@
             {% if user %}
               <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">建立遺失登記</a>
             {% else %}
-              <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">先登入再登記</a>
+              <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">先填資料再登記</a>
             {% endif %}
             <a href="{{ url_for('sources') }}" class="ghost-btn" style="display:flex; align-items:center;">查看招領清單</a>
           </div>
