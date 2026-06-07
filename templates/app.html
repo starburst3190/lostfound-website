@@ -66,6 +66,8 @@
               <option value="all" {% if cur_source == 'all' %}selected{% endif %}>全部來源</option>
               {% if user %}
                 <option value="FB交流版" {% if cur_source == 'FB交流版' %}selected{% endif %}>FB交流版</option>
+              {% elif source_locks.facebook %}
+                <option value="FB交流版" {% if cur_source == 'FB交流版' %}selected{% endif %}>FB交流版（登入查看）</option>
               {% endif %}
               <option value="總圖書館" {% if cur_source == '總圖書館' %}selected{% endif %}>總圖書館</option>
               <option value="駐警隊" {% if cur_source == '駐警隊' %}selected{% endif %}>駐警隊</option>
@@ -78,7 +80,12 @@
             </select>
           {% endif %}
         </form>
-        <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">登記遺失物</a>
+        {% if user %}
+          <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">登記遺失物</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">登入</a>
+          <a href="{{ url_for('report') }}" class="ghost-btn" style="display:flex; align-items:center;">登記遺失物</a>
+        {% endif %}
       </div>
     </header>
 
@@ -110,8 +117,8 @@
             {% for name, count in summary.items() %}
             <div class="summary-card"><span>{{ name }}</span><strong>{{ count }}</strong></div>
             {% endfor %}
-            {% if not user %}
-            <div class="summary-card" style="opacity: 0.6; cursor: help;" title="登入後可查看更多來源"><span>FB交流版</span><strong>登入可見</strong></div>
+            {% if not user and source_locks.facebook %}
+            <div class="summary-card" style="opacity: 0.6; cursor: help;" title="FB交流版限台大學生登入後查看"><span>FB交流版</span><strong>請登入以查看</strong></div>
             {% endif %}
           </div>
         </section>
@@ -165,6 +172,19 @@
     <section class="view active">
       <section class="panel">
         <div class="card-grid">
+          {% if not user and source_locks.facebook and (cur_source == 'all' or cur_source == 'FB交流版') %}
+          <article class="item-card" style="display: flex; flex-direction: column; height: 100%;">
+            <div style="flex-grow: 1;">
+              <div class="card-badge">登入限定</div>
+              <h4>FB交流版</h4>
+              <div class="item-meta">限台大學生查看</div>
+              <p>FB交流版內容限台大學生登入後查看。請登入以查看。</p>
+            </div>
+            <div class="source-line" style="margin-top: auto; display: flex; align-items: center; gap: 8px;">
+              <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">登入</a>
+            </div>
+          </article>
+          {% endif %}
           {% for item in external_items %}
           <article class="item-card" style="display: flex; flex-direction: column; height: 100%;">
             <div style="flex-grow: 1;">

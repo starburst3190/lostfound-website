@@ -26,4 +26,5 @@ def frontend_bundle():
         "reports": [],
         "matches": [],
         "notifications": [],
+        "source_locks": {"facebook": True},
     }

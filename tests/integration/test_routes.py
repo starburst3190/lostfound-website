@@ -20,6 +20,7 @@ def test_dashboard_renders_guest_summary(client, monkeypatch, frontend_bundle):
     assert response.status_code == 200
     assert "訪客模式" in response.text
     assert "駐警隊" in response.text
+    assert "請登入以查看" in response.text
     assert "白色 AirPods Pro 耳機" not in response.text
 
 
@@ -32,6 +33,21 @@ def test_sources_filters_by_source_and_query(client, monkeypatch, frontend_bundl
     assert response.status_code == 200
     assert "黑色 iPhone 15 手機" in response.text
     assert "深咖啡色皮夾" not in response.text
+    assert "白色 AirPods Pro 耳機" not in response.text
+
+
+@pytest.mark.integration
+def test_sources_show_locked_facebook_prompt_for_guests(client, monkeypatch, frontend_bundle):
+    guest_bundle = deepcopy(frontend_bundle)
+    guest_bundle["external_items"] = [
+        item for item in guest_bundle["external_items"] if item["source_type"] != "facebook"
+    ]
+    monkeypatch.setattr(webapp, "fetch_bundle", lambda user_id: deepcopy(guest_bundle))
+
+    response = client.get("/sources?source=FB交流版")
+
+    assert response.status_code == 200
+    assert "FB交流版內容限台大學生登入後查看。請登入以查看。" in response.text
     assert "白色 AirPods Pro 耳機" not in response.text
 
 

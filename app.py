@@ -197,9 +197,16 @@ def fetch_bundle(user_id: int | None) -> dict:
         external_items = [_external_from_lost_item(r) for r in item_rows]
         external_items.extend(dict(item) for item in FRONTEND_ITEMS)
         external_items.sort(key=lambda item: item["found_at"], reverse=True)
+        source_locks = {"facebook": any(e["source_type"] == "facebook" for e in external_items)}
         if not user_id:
             external_items = [e for e in external_items if e["source_type"] != "facebook"]
-            return {"external_items": external_items, "reports": [], "matches": [], "notifications": []}
+            return {
+                "external_items": external_items,
+                "reports": [],
+                "matches": [],
+                "notifications": [],
+                "source_locks": source_locks,
+            }
 
         reports = [dict(r) for r in db.execute("SELECT * FROM lost_reports WHERE user_id = %s ORDER BY created_at DESC", (user_id,))]
         match_rows = db.execute(
@@ -224,7 +231,13 @@ def fetch_bundle(user_id: int | None) -> dict:
                 "external_source_url": ext["source_url"],
             })
         notifications = [dict(r) for r in db.execute("SELECT * FROM notifications WHERE user_id = %s ORDER BY created_at DESC", (user_id,))]
-    return {"external_items": external_items, "reports": reports, "matches": matches, "notifications": notifications}
+    return {
+        "external_items": external_items,
+        "reports": reports,
+        "matches": matches,
+        "notifications": notifications,
+        "source_locks": {"facebook": False},
+    }
 
 
 # --- Embeddings (JSON text 欄位 + Python cosine) ---
