@@ -33,7 +33,7 @@
         <button type="submit" class="ghost-btn full-btn">登出</button>
       </form>
     {% else %}
-      <a href="{{ url_for('login') }}" class="primary-btn full-btn" style="text-align: center; display: block;">立即登入</a>
+      <a href="{% if view == 'report' %}{{ url_for('login', next=url_for('report')) }}{% else %}{{ url_for('login') }}{% endif %}" class="primary-btn full-btn" style="text-align: center; display: block;" {% if view == 'report' %}data-preserve-report{% endif %}>立即登入</a>
     {% endif %}
   </aside>
 
@@ -83,7 +83,7 @@
         {% if user %}
           <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">登記遺失物</a>
         {% else %}
-          <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">登入</a>
+          <a href="{% if view == 'report' %}{{ url_for('login', next=url_for('report')) }}{% else %}{{ url_for('login') }}{% endif %}" class="primary-btn" style="display:flex; align-items:center;" {% if view == 'report' %}data-preserve-report{% endif %}>登入</a>
           <a href="{{ url_for('report') }}" class="ghost-btn" style="display:flex; align-items:center;">登記遺失物</a>
         {% endif %}
       </div>
@@ -219,7 +219,10 @@
             <h3>{% if edit_report %}編輯遺失登記{% else %}提報我遺失的物品{% endif %}</h3>
             <span>填寫越完整，越容易比對到相近招領物。你提供的資料僅作為系統媒合用途，其他使用者將無法查看。</span>
           </div>
-          <form action="{% if edit_report %}{{ url_for('edit_report', rid=edit_report.id) }}{% else %}{{ url_for('report') }}{% endif %}" method="POST" class="form-grid">
+          {% if not user and not edit_report %}
+          <div class="status-banner info full-width">請先登入才能送出登記。你可以先填資料，登入後會回到這裡，剛剛填的內容不會洗掉。</div>
+          {% endif %}
+          <form action="{% if edit_report %}{{ url_for('edit_report', rid=edit_report.id) }}{% else %}{{ url_for('report') }}{% endif %}" method="POST" class="form-grid" data-report-form data-auth-required="{% if user %}0{% else %}1{% endif %}">
             <label><span>物品名稱</span><input name="title" type="text" placeholder="例如：黑色 AirPods Pro" value="{{ edit_report.title if edit_report else '' }}" required /></label>
             <label><span>類型</span>
               <select name="category" required>
@@ -233,8 +236,13 @@
             <label><span>遺失日期（最晚，不確定可留空）</span><input name="lost_date_end" type="date" value="{{ edit_report.lost_date_end if edit_report else '' }}" /></label>
             <label class="full-width"><span>特徵描述</span><textarea name="description" rows="5" placeholder="例如：黑色保護殼、有白色貼紙。" required>{{ edit_report.description if edit_report else '' }}</textarea></label>
             <div class="form-actions full-width" style="display:flex; gap:12px;">
+              {% if user %}
               <button type="submit" class="primary-btn">{% if edit_report %}更新登記{% else %}送出登記{% endif %}</button>
               {% if edit_report %}<a href="{{ url_for('report') }}" class="ghost-btn" style="display:flex; align-items:center;">取消</a>{% endif %}
+              {% else %}
+              <button type="submit" class="primary-btn" disabled>送出登記</button>
+              <a href="{{ url_for('login', next=url_for('report')) }}" class="primary-btn" style="display:flex; align-items:center;" data-preserve-report>先登入再送出</a>
+              {% endif %}
             </div>
           </form>
         </section>
@@ -325,4 +333,44 @@
 
   </main>
 </section>
+{% if view == 'report' %}
+<script>
+  (function () {
+    const form = document.querySelector("[data-report-form]");
+    if (!form) return;
+    const storageKey = "lostfound.reportDraft";
+    const fieldNames = ["title", "category", "location", "lost_date_start", "lost_date_end", "description"];
+    const fields = fieldNames
+      .map((name) => form.elements.namedItem(name))
+      .filter(Boolean);
+
+    function saveDraft() {
+      const draft = {};
+      fields.forEach((field) => {
+        draft[field.name] = field.value;
+      });
+      sessionStorage.setItem(storageKey, JSON.stringify(draft));
+    }
+
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(storageKey) || "{}");
+      fields.forEach((field) => {
+        if (!field.value && draft[field.name]) {
+          field.value = draft[field.name];
+        }
+      });
+    } catch (error) {
+      sessionStorage.removeItem(storageKey);
+    }
+
+    form.addEventListener("input", saveDraft);
+    document.querySelectorAll("[data-preserve-report]").forEach((link) => {
+      link.addEventListener("click", saveDraft);
+    });
+    if (form.dataset.authRequired === "0") {
+      form.addEventListener("submit", () => sessionStorage.removeItem(storageKey));
+    }
+  })();
+</script>
+{% endif %}
 {% endblock %}

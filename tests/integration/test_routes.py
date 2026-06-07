@@ -52,11 +52,33 @@ def test_sources_show_locked_facebook_prompt_for_guests(client, monkeypatch, fro
 
 
 @pytest.mark.integration
-def test_report_requires_login(client):
+def test_guest_can_open_report_page_but_cannot_submit(client, monkeypatch, frontend_bundle):
+    guest_bundle = deepcopy(frontend_bundle)
+    guest_bundle["external_items"] = [
+        item for item in guest_bundle["external_items"] if item["source_type"] != "facebook"
+    ]
+    monkeypatch.setattr(webapp, "fetch_bundle", lambda user_id: deepcopy(guest_bundle))
+
     response = client.get("/report")
 
+    assert response.status_code == 200
+    assert "請先登入才能送出登記" in response.text
+    assert "先登入再送出" in response.text
+
+    response = client.post(
+        "/report",
+        data={
+            "title": "AirPods Pro 不見了",
+            "category": "電子產品",
+            "location": "二活三樓",
+            "lost_date_start": "2026-06-07",
+            "lost_date_end": "2026-06-07",
+            "description": "白色耳機盒，灰色保護套",
+        },
+    )
+
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/login")
+    assert response.headers["Location"].endswith("/login?next=/report")
 
 
 @pytest.mark.integration
@@ -98,6 +120,63 @@ class InsertConnection:
 
     def close(self):
         pass
+
+
+class ExistingUserResult:
+    def fetchone(self):
+        return {"id": 7, "supabase_id": "supabase-user-id"}
+
+
+class ExistingUserConnection:
+    def execute(self, query, params=()):
+        assert "SELECT id, supabase_id FROM users" in query
+        return ExistingUserResult()
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class FakeSupabaseUser:
+    id = "supabase-user-id"
+
+
+class VerifyOtpResult:
+    user = FakeSupabaseUser()
+
+
+class FakeSupabaseAuth:
+    def sign_in_with_otp(self, payload):
+        assert payload == {"email": "student@ntu.edu.tw"}
+
+    def verify_otp(self, payload):
+        assert payload["email"] == "student@ntu.edu.tw"
+        assert payload["token"] == "123456"
+        assert payload["type"] == "email"
+        return VerifyOtpResult()
+
+
+class FakeSupabase:
+    auth = FakeSupabaseAuth()
+
+
+@pytest.mark.integration
+def test_login_returns_to_next_url_after_otp_verification(client, monkeypatch):
+    monkeypatch.setattr(webapp, "supabase", FakeSupabase())
+    monkeypatch.setattr(webapp, "get_db", ExistingUserConnection)
+
+    response = client.get("/login?next=/report")
+    assert response.status_code == 200
+
+    response = client.post("/login", data={"email": "student@ntu.edu.tw"})
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/verify")
+
+    response = client.post("/verify", data={"otp": "123456"})
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/report")
 
 
 @pytest.mark.integration

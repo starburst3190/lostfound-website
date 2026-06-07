@@ -79,6 +79,11 @@ def now_iso() -> str:
 def is_ntu_email(email: str) -> bool:
     return email.strip().lower().endswith("@ntu.edu.tw")
 
+def safe_next_url(value: str | None) -> str | None:
+    if value and value.startswith("/") and not value.startswith("//"):
+        return value
+    return None
+
 # 應用自有資料表（找到的招領物 lost_items 由爬蟲 / SQLAlchemy 那側維護）。
 _SCHEMA_STATEMENTS = [
     """CREATE TABLE IF NOT EXISTS users (
@@ -446,6 +451,10 @@ def process_new_lost_items() -> dict:
 # --- Routes ---
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = safe_next_url(request.args.get("next"))
+    if next_url:
+        session["next_url"] = next_url
+
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         if not is_ntu_email(email):
@@ -514,7 +523,8 @@ def verify():
                 session.pop("auth_email", None)
                 session.pop("auth_time", None)
                 session.permanent = True
-                return redirect(url_for("dashboard"))
+                next_url = session.pop("next_url", None)
+                return redirect(next_url or url_for("dashboard"))
         except Exception:
             flash("驗證失敗: 驗證碼錯誤或已過期。", "error")
     return render_template("auth.html", step="otp", email=email)
@@ -573,9 +583,11 @@ def _owned_report(db, rid: int, user_id: int):
 @app.route("/report", methods=["GET", "POST"])
 def report():
     user_id = require_login()
-    if not user_id: return redirect(url_for("login"))
-    user = get_user(user_id)
+    user = get_user(user_id) if user_id else None
     if request.method == "POST":
+        if not user_id:
+            flash("請先登入，登入後會回到登記頁繼續完成送出。", "error")
+            return redirect(url_for("login", next=url_for("report")))
         data = _read_report_form()
         if data:
             with closing(get_db()) as db:

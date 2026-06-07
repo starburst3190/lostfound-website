@@ -46,11 +46,17 @@ def live_server(monkeypatch):
         return {"id": user_id, "email": "student@ntu.edu.tw"}
 
     def fetch_bundle(user_id):
+        external_items = deepcopy(FRONTEND_ITEMS)
+        source_locks = {"facebook": False}
+        if not user_id:
+            external_items = [item for item in external_items if item["source_type"] != "facebook"]
+            source_locks = {"facebook": True}
         return {
-            "external_items": deepcopy(FRONTEND_ITEMS),
+            "external_items": external_items,
             "reports": deepcopy(state["reports"]),
             "matches": deepcopy(state["matches"]),
             "notifications": [],
+            "source_locks": source_locks,
         }
 
     def run_matching(report_id):
@@ -124,6 +130,15 @@ def _login_browser(browser, live_server):
     )
 
 
+def _set_date(browser, name, value):
+    element = browser.find_element(By.NAME, name)
+    browser.execute_script(
+        "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('input', {bubbles: true}));",
+        element,
+        value,
+    )
+
+
 @pytest.mark.ui
 def test_user_submits_report_and_sees_match(browser, live_server):
     _login_browser(browser, live_server)
@@ -135,8 +150,8 @@ def test_user_submits_report_and_sees_match(browser, live_server):
     )
     browser.find_element(By.NAME, "category").send_keys("電子產品")
     browser.find_element(By.NAME, "location").send_keys("二活三樓")
-    browser.find_element(By.NAME, "lost_date_start").send_keys("06/07/2026")
-    browser.find_element(By.NAME, "lost_date_end").send_keys("06/07/2026")
+    _set_date(browser, "lost_date_start", "2026-06-07")
+    _set_date(browser, "lost_date_end", "2026-06-07")
     browser.find_element(By.NAME, "description").send_keys(
         "白色耳機盒，灰色保護套"
     )
@@ -148,3 +163,35 @@ def test_user_submits_report_and_sees_match(browser, live_server):
     assert "白色 AirPods Pro 耳機" in page
     assert "83%" in page
     assert "FB交流版" in page
+
+
+@pytest.mark.ui
+def test_guest_report_draft_survives_login_redirect(browser, live_server):
+    wait = WebDriverWait(browser, 10)
+
+    browser.get(f"{live_server}/report")
+    wait.until(ec.visibility_of_element_located((By.NAME, "title"))).send_keys(
+        "黑色 iPhone 15 手機"
+    )
+    browser.find_element(By.NAME, "category").send_keys("電子產品")
+    browser.find_element(By.NAME, "location").send_keys("新生南路校門")
+    _set_date(browser, "lost_date_start", "2026-06-07")
+    _set_date(browser, "lost_date_end", "2026-06-07")
+    browser.find_element(By.NAME, "description").send_keys("透明保護殼，背面有藍色貼紙")
+
+    submit = browser.find_element(By.CSS_SELECTOR, "form.form-grid button[type='submit']")
+    assert submit.get_attribute("disabled") == "true"
+    browser.find_element(By.CSS_SELECTOR, "[data-preserve-report]").click()
+
+    wait.until(ec.url_contains("/login"))
+    assert "next=/report" in browser.current_url
+
+    _login_browser(browser, live_server)
+    browser.get(f"{live_server}/report")
+
+    assert wait.until(ec.visibility_of_element_located((By.NAME, "title"))).get_attribute("value") == "黑色 iPhone 15 手機"
+    assert browser.find_element(By.NAME, "category").get_attribute("value") == "電子產品"
+    assert browser.find_element(By.NAME, "location").get_attribute("value") == "新生南路校門"
+    assert browser.find_element(By.NAME, "lost_date_start").get_attribute("value") == "2026-06-07"
+    assert browser.find_element(By.NAME, "lost_date_end").get_attribute("value") == "2026-06-07"
+    assert browser.find_element(By.NAME, "description").get_attribute("value") == "透明保護殼，背面有藍色貼紙"

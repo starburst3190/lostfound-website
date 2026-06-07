@@ -289,6 +289,13 @@ textarea {
   box-shadow: none;
 }
 
+.primary-btn:disabled {
+  background: #aeb8c6;
+  color: #f4f7fb;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .ghost-btn {
   background: var(--accent-soft);
   color: var(--accent-dark);
