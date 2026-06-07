@@ -106,7 +106,7 @@
             {% if user %}
               <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">建立遺失登記</a>
             {% else %}
-              <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">登入以建立登記</a>
+              <a href="{{ url_for('login') }}" class="primary-btn" style="display:flex; align-items:center;">先登入再登記</a>
             {% endif %}
             <a href="{{ url_for('sources') }}" class="ghost-btn" style="display:flex; align-items:center;">查看招領清單</a>
           </div>
@@ -216,7 +216,7 @@
       <div class="content-grid report-grid">
         <section class="panel">
           <div class="panel-head">
-            <h3>{% if edit_report %}編輯遺失登記{% else %}提報我遺失的物品{% endif %}</h3>
+            <h3>{% if edit_report %}編輯遺失登記{% else %}登記我遺失的物品{% endif %}</h3>
             <span>填寫越完整，越容易比對到相近招領物。你提供的資料僅作為系統媒合用途，其他使用者將無法查看。</span>
           </div>
           {% if not user and not edit_report %}
@@ -247,7 +247,7 @@
           </form>
         </section>
         <section class="panel">
-          <div class="panel-head"><h3>我的最近提報</h3><span>你送出的遺失登記會在這裡累積。</span></div>
+          <div class="panel-head"><h3>我的最近登記</h3><span>你送出的遺失登記會在這裡累積。</span></div>
           <div class="list-stack">
             {% for report in reports %}
             <div class="feed-item">
