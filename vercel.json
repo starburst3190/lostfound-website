@@ -8,7 +8,6 @@
           "app.py",
           "matching.py",
           "bridge.py",
-          "frontend_items.py",
           "location_aliases.json",
           "category_rules.json",
           "templates/**",

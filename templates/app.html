@@ -64,13 +64,7 @@
           {% if view == 'sources' %}
             <select name="source" onchange="this.form.submit()" class="inline-select">
               <option value="all" {% if cur_source == 'all' %}selected{% endif %}>全部來源</option>
-              {% if user %}
-                <option value="FB交流版" {% if cur_source == 'FB交流版' %}selected{% endif %}>FB交流版</option>
-              {% elif source_locks.facebook %}
-                <option value="FB交流版" {% if cur_source == 'FB交流版' %}selected{% endif %}>FB交流版（登入查看）</option>
-              {% endif %}
               <option value="總圖書館" {% if cur_source == '總圖書館' %}selected{% endif %}>總圖書館</option>
-              <option value="駐警隊" {% if cur_source == '駐警隊' %}selected{% endif %}>駐警隊</option>
             </select>
             <select name="category" onchange="this.form.submit()" class="inline-select">
               <option value="all" {% if cur_cat == 'all' %}selected{% endif %}>全部類型</option>

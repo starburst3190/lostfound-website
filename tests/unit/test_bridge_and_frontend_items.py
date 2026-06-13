@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import pytest
 
 import bridge
-import matching
-from frontend_items import FRONTEND_ITEMS
 
 
 @pytest.mark.unit
@@ -29,29 +25,3 @@ def test_lost_item_to_external_maps_scraper_row():
     assert external["category"] == "雨傘"
     assert external["found_at"] == "2026-06-07T00:00:00"
     assert "存放：一樓服務台" in external["description"]
-
-
-@pytest.mark.unit
-def test_frontend_items_follow_external_contract():
-    required = {
-        "source_ref",
-        "title",
-        "category",
-        "location",
-        "found_at",
-        "description",
-        "source_name",
-        "source_type",
-        "source_url",
-    }
-
-    assert len(FRONTEND_ITEMS) == 8
-    assert sum(item["source_name"] == "駐警隊" for item in FRONTEND_ITEMS) == 4
-    assert sum(item["source_name"] == "FB交流版" for item in FRONTEND_ITEMS) == 4
-
-    for item in FRONTEND_ITEMS:
-        assert required <= item.keys()
-        assert item["category"] in matching.CANONICAL_CATEGORIES
-        datetime.fromisoformat(item["found_at"])
-        if item["source_type"] == "facebook":
-            assert item["source_url"].startswith("https://")

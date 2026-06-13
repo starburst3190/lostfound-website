@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 
 import matching
 import bridge
-from frontend_items import FRONTEND_ITEMS
 
 load_dotenv()
 
@@ -200,7 +199,6 @@ def fetch_bundle(user_id: int | None) -> dict:
     with closing(get_db()) as db:
         item_rows = db.execute("SELECT * FROM lost_items ORDER BY found_date DESC").fetchall()
         external_items = [_external_from_lost_item(r) for r in item_rows]
-        external_items.extend(dict(item) for item in FRONTEND_ITEMS)
         external_items.sort(key=lambda item: item["found_at"], reverse=True)
         source_locks = {"facebook": any(e["source_type"] == "facebook" for e in external_items)}
         if not user_id:

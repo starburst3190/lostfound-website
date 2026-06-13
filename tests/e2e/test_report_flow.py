@@ -12,7 +12,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from werkzeug.serving import make_server
 
 import app as webapp
-from frontend_items import FRONTEND_ITEMS
+
+
+TEST_ITEMS = [
+    {
+        "source_ref": "school_libraries:test-airpods",
+        "title": "白色 AirPods Pro 耳機",
+        "category": "電子產品",
+        "location": "第二學生活動中心三樓",
+        "found_at": "2026-06-07T12:35:00",
+        "description": "白色 AirPods Pro 充電盒，外殼有灰色保護套。",
+        "source_name": "總圖書館",
+        "source_type": "library",
+        "source_url": "",
+    },
+]
 
 
 class InsertResult:
@@ -46,11 +60,8 @@ def live_server(monkeypatch):
         return {"id": user_id, "email": "student@ntu.edu.tw"}
 
     def fetch_bundle(user_id):
-        external_items = deepcopy(FRONTEND_ITEMS)
+        external_items = deepcopy(TEST_ITEMS)
         source_locks = {"facebook": False}
-        if not user_id:
-            external_items = [item for item in external_items if item["source_type"] != "facebook"]
-            source_locks = {"facebook": True}
         return {
             "external_items": external_items,
             "reports": deepcopy(state["reports"]),
@@ -81,9 +92,9 @@ def live_server(monkeypatch):
                 "report_title": "AirPods Pro 不見了",
                 "external_title": "白色 AirPods Pro 耳機",
                 "external_location": "第二學生活動中心三樓",
-                "external_source_name": "FB交流版",
-                "external_source_type": "facebook",
-                "external_source_url": "https://www.facebook.com/",
+                "external_source_name": "總圖書館",
+                "external_source_type": "library",
+                "external_source_url": "",
             }
         )
 
@@ -162,7 +173,7 @@ def test_user_submits_report_and_sees_match(browser, live_server):
     assert "AirPods Pro 不見了" in page
     assert "白色 AirPods Pro 耳機" in page
     assert "83%" in page
-    assert "FB交流版" in page
+    assert "總圖書館" in page
 
 
 @pytest.mark.ui
