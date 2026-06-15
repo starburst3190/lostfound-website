@@ -100,7 +100,7 @@
             {% if user %}
               <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">建立遺失登記</a>
             {% else %}
-              <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">先填資料再登記</a>
+              <a href="{{ url_for('report') }}" class="primary-btn" style="display:flex; align-items:center;">預覽遺失登記</a>
             {% endif %}
             <a href="{{ url_for('sources') }}" class="ghost-btn" style="display:flex; align-items:center;">查看招領清單</a>
           </div>
@@ -235,7 +235,7 @@
               {% if edit_report %}<a href="{{ url_for('report') }}" class="ghost-btn" style="display:flex; align-items:center;">取消</a>{% endif %}
               {% else %}
               <button type="submit" class="primary-btn" disabled>送出登記</button>
-              <a href="{{ url_for('login', next=url_for('report')) }}" class="primary-btn" style="display:flex; align-items:center;" data-preserve-report>先登入再送出</a>
+              <a href="{{ url_for('login', next=url_for('report')) }}" class="primary-btn" style="display:flex; align-items:center;" data-preserve-report>請先登入</a>
               {% endif %}
             </div>
           </form>
