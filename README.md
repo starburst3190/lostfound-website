@@ -25,10 +25,27 @@ matches / notifications  ←─ 使用者提報（app.py 即時正向媒合）
    使用者
 ```
 
-- **資料庫**：Supabase Postgres（透過 transaction pooler 連線；無本地 SQLite）
+- **資料庫**：Supabase Postgres（透過 transaction pooler 連線）
 - **認證**：Supabase Auth Email OTP
 - **語意比對**：Jina embeddings v3（未設金鑰時自動退回關鍵字比對）
 - **前端**：Flask + Jinja 伺服器端渲染
+
+## 技術棧
+
+| 範疇 | 使用技術 |
+|------|----------|
+| 語言 / 執行環境 | Python 3.12+ |
+| Web 框架 | Flask 3 + Jinja2（伺服器端渲染） |
+| 資料庫存取 | Supabase Postgres；psycopg 3（執行時直連）+ Flask-SQLAlchemy（建表 / 灌資料用 ORM） |
+| 認證 | Supabase Auth（Email OTP），supabase-py 客戶端 |
+| 語意比對 | Jina embeddings v3（text-matching，1024 維），cosine 於 Python 端計算 |
+| 爬蟲 | requests + BeautifulSoup4 |
+| Email 通知 | SMTP（標準庫 smtplib） |
+| 設定管理 | python-dotenv |
+| 套件管理 | Poetry（`pyproject.toml`）→ 匯出 `requirements.txt` 供部署 |
+| 任務指令 | Task（`Taskfile.yml`） |
+| 測試 | pytest（單元 / 整合）、Selenium（端對端） |
+| 部署 | Vercel（`@vercel/python` WSGI）；另提供 Dockerfile 自架 |
 
 ## 專案結構
 
