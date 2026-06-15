@@ -102,11 +102,6 @@ task crawl-lib        # 爬圖書館失物 → 寫入 Supabase lost_items（7 �
 task match-lostitems  # 對新招領物算 embedding，反向比對現有通報、必要時寄通知
 ```
 
-也可以交給 **GitHub Actions** 自動排程（避開 Supabase 排程被擋的問題）：
-`.github/workflows/scrape.yml` 每日跑「爬蟲 → 媒合」。需在 repo Secrets 設定
-`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`DATABASE_URL`、`SUPABASE_ANON_KEY`、
-`JINA_API_KEY`（以及選用的 `SMTP_*`）。
-
 ## 部署到 Vercel（主要部署方式）
 
 整個 Flask app 透過 `api/index.py`（WSGI）跑在 Vercel 上，`vercel.json` 會把所有路徑
