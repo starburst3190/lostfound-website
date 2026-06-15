@@ -31,9 +31,11 @@ import matching
 # 來源類型沿用 external_items.source_type；facebook 類型在通報通知時會附原始連結。
 SOURCE_SYSTEM_MAP: dict[str, tuple[str, str]] = {
     "school_libraries": ("總圖書館", "library"),
+    "campus_police": ("駐警隊", "police"),
+    # campus_police_raw（爬蟲保留的原始整則公告）不在此列：app.py 的查詢以
+    # _EXCLUDE_RAW_SQL 過濾掉 *_raw，不應出現在前端 / 媒合。
     # 之後新增來源時在此擴充，例如：
     # "fb_exchange": ("FB交流版", "facebook"),
-    # "campus_police": ("駐警隊", "police"),
 }
 
 _TITLE_MAX = 40

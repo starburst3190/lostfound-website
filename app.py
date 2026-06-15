@@ -189,6 +189,11 @@ def get_user(user_id: int):
 
 
 # --- Found items (lost_items) <-> 前端 / 媒合用的 external 形狀 ---
+# 排除爬蟲保留的「原始整則公告」列（source_system 以 _raw 結尾，例如 campus_police_raw）。
+# 這些整則公告只供參考 / 日後重新解析，不應進入前端列表或媒合候選。集中成一個述詞，
+# 避免各查詢各自漏寫；底線需以 ESCAPE 轉義（LIKE 的 _ 預設是萬用字元）。
+_EXCLUDE_RAW_SQL = "source_system NOT LIKE '%\\_raw' ESCAPE '\\'"
+
 def _external_from_lost_item(row: dict) -> dict:
     """把一筆 lost_items 列映射成前端 / 媒合用的 dict，並帶上 id。"""
     external = bridge.lost_item_to_external(row)
@@ -197,7 +202,7 @@ def _external_from_lost_item(row: dict) -> dict:
 
 def fetch_bundle(user_id: int | None) -> dict:
     with closing(get_db()) as db:
-        item_rows = db.execute("SELECT * FROM lost_items ORDER BY found_date DESC").fetchall()
+        item_rows = db.execute(f"SELECT * FROM lost_items WHERE {_EXCLUDE_RAW_SQL} ORDER BY found_date DESC").fetchall()
         external_items = [_external_from_lost_item(r) for r in item_rows]
         external_items.sort(key=lambda item: item["found_at"], reverse=True)
         source_locks = {"facebook": any(e["source_type"] == "facebook" for e in external_items)}
@@ -280,7 +285,7 @@ def _ensure_item_embedding(db, item_row, external) -> list[float] | None:
 
 def _ensure_all_item_embeddings(db) -> None:
     """為尚未產生向量的招領物批次補算 embedding。"""
-    rows = db.execute("SELECT * FROM lost_items WHERE embedding IS NULL OR embedding = ''").fetchall()
+    rows = db.execute(f"SELECT * FROM lost_items WHERE (embedding IS NULL OR embedding = '') AND {_EXCLUDE_RAW_SQL}").fetchall()
     if not rows:
         return
     for start in range(0, len(rows), EMBED_BATCH):
@@ -293,7 +298,7 @@ def _ensure_all_item_embeddings(db) -> None:
 
 def _item_cosines(db, report_embedding: list[float]) -> dict[int, float]:
     result: dict[int, float] = {}
-    for row in db.execute("SELECT id, embedding FROM lost_items WHERE embedding IS NOT NULL AND embedding <> ''"):
+    for row in db.execute(f"SELECT id, embedding FROM lost_items WHERE embedding IS NOT NULL AND embedding <> '' AND {_EXCLUDE_RAW_SQL}"):
         try:
             vec = json.loads(row["embedding"])
         except (TypeError, ValueError):
@@ -413,7 +418,7 @@ def run_matching(report_id: int) -> None:
             except Exception:
                 app.logger.exception("語意媒合失敗，改用關鍵字比對")
         new_pairs = []
-        for item_row in db.execute("SELECT * FROM lost_items").fetchall():
+        for item_row in db.execute(f"SELECT * FROM lost_items WHERE {_EXCLUDE_RAW_SQL}").fetchall():
             external = _external_from_lost_item(item_row)
             cos = cosine_by_item.get(item_row["id"]) if cosine_by_item is not None else None
             if _try_create_match(db, report, external, cos):
@@ -452,7 +457,7 @@ def process_new_lost_items() -> dict:
     這支負責後續的語意處理與媒合，適合在每次爬完後執行（task match-lostitems）。
     """
     with closing(get_db()) as db:
-        new_ids = [r["id"] for r in db.execute("SELECT id FROM lost_items WHERE embedding IS NULL OR embedding = '' ORDER BY id")]
+        new_ids = [r["id"] for r in db.execute(f"SELECT id FROM lost_items WHERE (embedding IS NULL OR embedding = '') AND {_EXCLUDE_RAW_SQL} ORDER BY id")]
     # 先跨所有新招領物收集配對，再依使用者彙整 → 一個人一封信。
     all_new: list[tuple] = []
     for lost_item_id in new_ids:

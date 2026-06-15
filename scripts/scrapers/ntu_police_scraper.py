@@ -23,12 +23,15 @@ free text inside 公告內容, e.g.:
     6/8：
     1.耳罩式藍芽耳機－舊體前草地
 
-So we emit TWO kinds of lost_items rows per announcement:
-  * RAW   (source_system="campus_police_raw"): the whole announcement kept
-          verbatim for reference / re-parsing later. original_id = 篇號.
+So we can emit TWO kinds of lost_items rows per announcement:
   * PARSED(source_system="campus_police"):     one row per item line, with a
           per-item found_date/location/category. original_id = "{篇號}-{NNN}",
           NNN the item's ordinal in the announcement (append-only -> stable).
+          This is the default output.
+  * RAW   (source_system="campus_police_raw"): the whole announcement kept
+          verbatim for reference / re-parsing later. original_id = 篇號.
+          OPT-IN via --with-raw. The app hides source_system='*_raw' from the
+          UI/matching, so pushing raw by default just clutters the table.
 
 Two endpoint quirks handled here:
   * ann.cc.ntu.edu.tw's TLS cert lacks the Subject Key Identifier extension,
@@ -336,7 +339,7 @@ def build_rows(summary, detail):
     return raw_row, parsed_rows
 
 
-def scrape(include_old=False, delay=0.5, limit=None):
+def scrape(include_old=False, delay=0.5, limit=None, with_raw=False):
     summaries = get_list(include_old)
     if limit:
         summaries = summaries[:limit]
@@ -351,7 +354,11 @@ def scrape(include_old=False, delay=0.5, limit=None):
             print(f"  ! [{i}] detail failed for {num}: {exc}", file=sys.stderr)
             continue
         raw_row, parsed = build_rows(summ, detail)
-        rows.append(raw_row)
+        # Raw (whole-announcement) rows are opt-in: they are reference-only and
+        # the app filters source_system='*_raw' out of the UI/matching. Pushing
+        # them by default previously cluttered the site, so default to off.
+        if with_raw:
+            rows.append(raw_row)
         rows.extend(parsed)
         if not parsed:
             no_items.append(num)
@@ -409,16 +416,20 @@ def main():
                     help="seconds between detail requests (default 0.5)")
     ap.add_argument("--limit", type=int, default=None,
                     help="only process first N announcements (testing)")
+    ap.add_argument("--with-raw", action="store_true",
+                    help="also emit whole-announcement rows (source_system=campus_police_raw); "
+                         "off by default — these are reference-only and hidden from the site")
     ap.add_argument("--dry-run", action="store_true",
                     help="do not touch the DB; write rows to --out instead")
     ap.add_argument("--out", default="ntu_police_rows.json",
                     help="dry-run output path (default ntu_police_rows.json)")
     args = ap.parse_args()
 
-    rows = scrape(include_old=args.all, delay=args.delay, limit=args.limit)
+    rows = scrape(include_old=args.all, delay=args.delay, limit=args.limit, with_raw=args.with_raw)
     raw = sum(1 for r in rows if r["source_system"] == SOURCE_RAW)
     parsed = len(rows) - raw
-    print(f"\nBuilt {len(rows)} rows ({raw} raw announcements, {parsed} parsed items).")
+    print(f"\nBuilt {len(rows)} rows ({parsed} parsed items"
+          + (f", {raw} raw announcements" if raw else ", raw disabled") + ").")
 
     if args.dry_run:
         with open(args.out, "w", encoding="utf-8") as fh:
