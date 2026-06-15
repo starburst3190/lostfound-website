@@ -314,7 +314,7 @@
           {% for notify in notifications %}
           <div class="notify-item {% if notify.is_read %}read{% else %}unread{% endif %}">
             <strong>{{ notify.subject }}</strong>
-            <div class="notify-meta">{{ notify.message }}</div>
+            <div class="notify-meta" style="white-space: pre-line;">{{ notify.message }}</div>
             <div class="notify-meta">{{ notify.created_at|format_time }}</div>
           </div>
           {% else %}

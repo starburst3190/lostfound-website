@@ -31,19 +31,34 @@ JINA_TASK = "text-matching"
 EMBED_DIM = 1024
 JINA_TIMEOUT = 60  # 批次請求較大，給寬一點的逾時秒數
 
-# --- 評分權重（可依實際資料微調）---
-CATEGORY_POINTS = 25      # 類型一致
-LOCATION_POINTS = 15      # 地點相近
-TIME_IN_RANGE_POINTS = 15 # 拾獲日落在通報的遺失日期區間內的分數
-TIME_OK_POINTS = 8        # 距區間 <= 2 天的分數
-TIME_NEAR_POINTS = 4      # 距區間 <= 5 天的分數
+# --- 評分權重 ---
+# 設計原則：物品「本身」（名稱 / 描述）的語意相似度才是主訊號；類型 / 地點 / 時間只是輔助，
+# 用來在「名稱已相近」的候選之間做排序與加強信心。
+#
+# 關鍵不變式：STRUCTURED_MAX（類型 + 地點 + 時間的上限）< MATCH_THRESHOLD。
+# 因此「光靠類型 + 地點 + 時間」永遠跨不過門檻 —— 一定要名稱 / 語意有一定相似度，
+# 才補得上差距而成立媒合。這修正了舊版「類型 25 + 地點 15 = 40，再湊任一條件就跨過 45」
+# 的誤判（例：同類型、同地點、同一天，但一個是筆電、一個是耳機，也會被判為媒合）。
+CATEGORY_POINTS = 15      # 類型一致（正規類別只有約 11 種，是弱證據，故權重不高）
+LOCATION_POINTS = 10      # 地點相近
+TIME_IN_RANGE_POINTS = 12 # 拾獲日落在通報的遺失日期區間內的分數
+TIME_OK_POINTS = 6        # 距區間 <= 2 天的分數
+TIME_NEAR_POINTS = 3      # 距區間 <= 5 天的分數
 TIME_SLACK_OK_DAYS = 2
 TIME_SLACK_NEAR_DAYS = 5
-SEMANTIC_MAX = 45         # 語意相似最高加分
-SEMANTIC_FLOOR = 0.35     # cosine 低於此值不計語意分（過濾雜訊）
-KEYWORD_MAX = 25          # 無向量時的關鍵字 fallback 上限
-MATCH_THRESHOLD = 45      # 達到此分數才視為一筆媒合
+# 類型 + 地點 + 時間全中也只有 37 分，刻意 < MATCH_THRESHOLD（見上方不變式）。
+STRUCTURED_MAX = CATEGORY_POINTS + LOCATION_POINTS + TIME_IN_RANGE_POINTS
+SEMANTIC_MAX = 60         # 語意（名稱 / 描述）相似最高加分 —— 全場最大的單一權重
+SEMANTIC_FLOOR = 0.40     # cosine 低於此值不計語意分（過濾雜訊；提高門檻讓「名稱相近」更嚴格）
+KEYWORD_MAX = 30          # 無向量時的關鍵字 fallback 上限
+KEYWORD_PER_TOKEN = 7     # 每個重疊關鍵字的分數（無向量 fallback 用）
+MATCH_THRESHOLD = 45      # 達到此分數才視為一筆媒合（> STRUCTURED_MAX，故名稱訊號為必要條件）
 SCORE_CAP = 99
+
+# 防呆：若日後有人調權重把這條不變式弄壞（結構化訊號又能單獨成立），import 時就會炸出來。
+assert STRUCTURED_MAX < MATCH_THRESHOLD, (
+    "結構化訊號（類型/地點/時間）的總分不應 >= 媒合門檻，否則名稱不相近也會誤判為媒合"
+)
 
 # --- 台大校內地點簡稱 → 正式名稱 ---
 # 校內慣用簡稱（如「活大」）一般 embedding 模型不認得，且地點是用結構化比對而非語意，
@@ -299,7 +314,7 @@ def _keyword_score(report, external) -> tuple[int, list[str]]:
     )
     if not shared:
         return 0, []
-    points = min(KEYWORD_MAX, len(shared) * 6)
+    points = min(KEYWORD_MAX, len(shared) * KEYWORD_PER_TOKEN)
     return points, ["關鍵字重疊：" + "、".join(sorted(shared)[:4])]
 
 
