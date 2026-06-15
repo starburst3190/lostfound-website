@@ -16,13 +16,18 @@ CREATE TABLE IF NOT EXISTS users (
     created_at text NOT NULL
 );
 
+-- lost_date_start / lost_date_end 為遺失日期區間（YYYY-MM-DD，天精度）；使用者通常記不清
+-- 確切時間、且圖書館資料只有日期，故以區間取代原本精確到分鐘的單一時刻（舊欄位 lost_at）。
+-- status：open（進行中）/ resolved（已找到）。
 CREATE TABLE IF NOT EXISTS lost_reports (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id bigint NOT NULL REFERENCES users(id),
     title text NOT NULL,
     category text,
     location text,
-    lost_at text NOT NULL,
+    lost_date_start text,
+    lost_date_end text,
+    status text NOT NULL DEFAULT 'open',
     description text,
     embedding text,          -- 語意向量（JSON 陣列字串）
     created_at text NOT NULL
