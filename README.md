@@ -39,7 +39,7 @@ matches / notifications  ←─ 使用者提報（app.py 即時正向媒合）
 | 資料庫存取 | Supabase Postgres；psycopg 3（執行時直連）+ Flask-SQLAlchemy（建表 / 灌資料用 ORM） |
 | 認證 | Supabase Auth（Email OTP），supabase-py 客戶端 |
 | 語意比對 | Jina embeddings v3（text-matching，1024 維），cosine 於 Python 端計算 |
-| 爬蟲 | requests + BeautifulSoup4 |
+| 爬蟲 | requests / urllib + BeautifulSoup4；Facebook 以 Chrome DevTools Protocol 讀取已登入瀏覽器 |
 | Email 通知 | SMTP（標準庫 smtplib） |
 | 設定管理 | python-dotenv |
 | 套件管理 | Poetry（`pyproject.toml`）→ 匯出 `requirements.txt` 供部署 |
@@ -65,7 +65,9 @@ lostfound-website/
 │   ├── seed_from_csv.py    # 選用：用 CSV 灌 lost_items
 │   ├── match_lost_items.py # 對新爬到的招領物算向量 + 媒合（task match-lostitems）
 │   └── scrapers/
-│       ├── supa_crawl_lib.py        # 正式爬蟲 → lost_items（task crawl-lib）
+│       ├── supa_crawl_lib.py        # 圖書館爬蟲 → lost_items（task crawl-lib）
+│       ├── ntu_police_scraper.py    # 駐警隊爬蟲 → lost_items（campus_police）
+│       ├── facebook_scraper.py      # FB 社團擷取（須本機 / 系上 VM 執行，見資料管線）
 │       └── lib_lostfound_scraper.py # 原型爬蟲 → CSV（開發用）
 ├── templates/              # auth.html / app.html / layout.html
 ├── static/styles.css
@@ -114,9 +116,29 @@ task up      # = cleanup + serve，預設 http://127.0.0.1:8000
 
 ## 資料管線（爬蟲 → 媒合）
 
+各來源爬蟲把招領物 upsert 進 `lost_items`，再由 `match-lostitems` 算向量並反向媒合：
+
 ```bash
-task crawl-lib        # 爬圖書館失物 → 寫入 Supabase lost_items（7 天 watermark、去重）
-task match-lostitems  # 對新招領物算 embedding，反向比對現有通報、必要時寄通知
+task crawl-lib                                  # 圖書館失物 → lost_items（7 天 watermark、去重）
+python3 scripts/scrapers/ntu_police_scraper.py  # 駐警隊失物 → lost_items（campus_police）
+task match-lostitems                            # 對新招領物算 embedding、反向比對通報、必要時寄通知
+```
+
+> 駐警隊可加 `--with-raw` 連「整則原始公告」一起寫入（`source_system` 以 `_raw` 結尾）；
+> 這類 `*_raw` 列只供日後重新解析，已被排除於前端與媒合之外。
+
+### Facebook 社團爬蟲（須在本機或系上 VM 執行）
+
+`scripts/scrapers/facebook_scraper.py` 透過 Chrome DevTools Protocol 讀取**已登入** Facebook
+的瀏覽器，因此**無法跑在 GitHub Actions / Vercel 等無頭或 serverless 環境**，必須在
+**本機或系上 VM（系上網段）** 上、用開了遠端除錯埠的 Chrome 來執行：
+
+```bash
+# 1) 啟動帶 CDP 埠的 Chrome（執行檔路徑依 OS 而定），登入 FB 並開到目標社團
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
+
+# 2) 另開終端機執行擷取器（預設輸出 JSON）
+python3 scripts/scrapers/facebook_scraper.py
 ```
 
 ## 部署到 Vercel（主要部署方式）
