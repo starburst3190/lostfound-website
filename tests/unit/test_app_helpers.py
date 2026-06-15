@@ -72,3 +72,21 @@ def test_build_match_email_bundles_multiple_results():
     assert "白色 AirPods Pro" in body
     assert "白色耳機盒" in body
     assert webapp.MATCH_DISCLAIMER in body
+
+
+@pytest.mark.unit
+def test_build_match_notification_bundles_batch_into_single_message():
+    """同一批的多筆配對應彙整成「一則」站內通知（標頭只出現一次）。"""
+    report = {"id": 1, "title": "遺失耳機"}
+    pairs = [
+        (report, {"title": "白色 AirPods Pro", "source_name": "FB交流版", "location": "二活三樓"}),
+        (report, {"title": "白色耳機盒", "source_name": "駐警隊", "location": "新生南路校門"}),
+    ]
+
+    subject, message = webapp._build_match_notification(pairs)
+
+    assert subject == "新的遺失物媒合結果（共 2 筆）"
+    # 同一份通報只出現一次標頭，兩個招領物列在同一則訊息裡。
+    assert message.count("你的遺失通報「遺失耳機」") == 1
+    assert "白色 AirPods Pro" in message
+    assert "白色耳機盒" in message

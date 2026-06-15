@@ -323,14 +323,16 @@ MATCH_DISCLAIMER = "提醒：本平台僅提供資訊媒合，實際認領請到
 
 def _match_line(external) -> str:
     line = f"・{external['title']}（來源：{external['source_name']}，地點：{external['location']}）"
-    if external["source_type"] == "facebook":
+    if external.get("source_type") == "facebook":
         line += f"\n  原始來源連結：{external['source_url']}"
     return line
 
 
-def _build_match_email(pairs) -> tuple[str, str]:
-    """把同一使用者的多筆新配對 (report, external) 彙整成一封信的 (subject, body)。"""
-    # 依通報分組，同一份通報的多個招領物列在同一段落。
+def _group_pairs_by_report(pairs) -> list[tuple]:
+    """把 (report, external) 配對依通報分組，保留首次出現順序。
+
+    回傳 [(report, [external, ...]), ...]，讓 email / 站內通知共用同一套分組邏輯。
+    """
     by_report: dict = {}
     order: list = []
     for report, external in pairs:
@@ -339,41 +341,62 @@ def _build_match_email(pairs) -> tuple[str, str]:
             by_report[rid] = (report, [])
             order.append(rid)
         by_report[rid][1].append(external)
+    return [by_report[rid] for rid in order]
 
+
+def _match_subject(pairs) -> str:
+    """email 與站內通知共用的標題：單筆帶物品名，多筆帶總數。"""
     if len(pairs) == 1:
-        subject = f"新的遺失物媒合結果：{pairs[0][0]['title']}"
-    else:
-        subject = f"新的遺失物媒合結果（共 {len(pairs)} 筆）"
+        return f"新的遺失物媒合結果：{pairs[0][0]['title']}"
+    return f"新的遺失物媒合結果（共 {len(pairs)} 筆）"
 
+
+def _build_match_email(pairs) -> tuple[str, str]:
+    """把同一使用者的多筆新配對 (report, external) 彙整成一封信的 (subject, body)。"""
+    # 依通報分組，同一份通報的多個招領物列在同一段落。
     sections = []
-    for rid in order:
-        report, externals = by_report[rid]
+    for report, externals in _group_pairs_by_report(pairs):
         lines = [f"你的遺失通報「{report['title']}」出現以下可能配對："]
         lines.extend(_match_line(ext) for ext in externals)
         sections.append("\n".join(lines))
     body = "\n\n".join(sections) + "\n\n" + MATCH_DISCLAIMER
-    return subject, body
+    return _match_subject(pairs), body
+
+
+def _build_match_notification(pairs) -> tuple[str, str]:
+    """把同一使用者、同一批的多筆新配對彙整成「一則」站內通知的 (subject, message)。
+
+    先前站內通知是逐筆 INSERT，導致同一批媒合在通知列表炸出多則；改為與 email 一致，
+    一批彙整成一則（依通報分組）。免責提醒已在通知頁標題顯示，故訊息本身不再重複附上。
+    訊息以換行分段，模板用 white-space: pre-line 呈現。
+    """
+    sections = []
+    for report, externals in _group_pairs_by_report(pairs):
+        lines = [f"你的遺失通報「{report['title']}」出現以下可能配對："]
+        lines.extend(
+            f"・{ext['title']}（來源：{ext['source_name']}，地點：{ext['location']}）"
+            for ext in externals
+        )
+        sections.append("\n".join(lines))
+    return _match_subject(pairs), "\n\n".join(sections)
 
 
 def _notify_user_matches(db, user, pairs) -> None:
-    """為單一使用者的所有新配對記錄站內通知，並寄出「一封」彙整信。
+    """為單一使用者的所有新配對記錄「一則」站內通知，並寄出「一封」彙整信。
 
-    pairs：list[(report, external)]，皆屬於同一個 user。
+    pairs：list[(report, external)]，皆屬於同一個 user。站內通知與 email 都把同一批
+    彙整成「一則 / 一封」，避免列表與信箱同時被同一批媒合洗版。
     """
     if not pairs:
         return
-    # 站內通知維持逐筆，方便使用者在列表逐項檢視。
-    for report, external in pairs:
-        message = f"你的遺失通報「{report['title']}」出現新的可能配對：{external['title']}（來源：{external['source_name']}，地點：{external['location']}）。"
-        subject = f"新的遺失物媒合結果：{report['title']}"
-        db.execute(
-            "INSERT INTO notifications (user_id, subject, message, delivery, created_at) VALUES (%s, %s, %s, 'email', %s)",
-            (user["id"], subject, message, now_iso()),
-        )
+    subject, message = _build_match_notification(pairs)
+    db.execute(
+        "INSERT INTO notifications (user_id, subject, message, delivery, created_at) VALUES (%s, %s, %s, 'email', %s)",
+        (user["id"], subject, message, now_iso()),
+    )
     db.commit()
-    # Email 則彙整成一封，避免同時多筆配對時連發多封信。
-    subject, body = _build_match_email(pairs)
-    send_email(user["email"], subject, body)
+    email_subject, email_body = _build_match_email(pairs)
+    send_email(user["email"], email_subject, email_body)
 
 def run_matching(report_id: int) -> None:
     """新通報 → 比對所有招領物（lost_items），對新配對發出通知。"""
